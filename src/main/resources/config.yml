@@ -1,0 +1,9 @@
+# DBの種類(sqlite/mysql)
+type: sqlite
+sqlite:
+  file: myserver.db
+mysql:
+  url: localhost:3306
+  name: myserver
+  user: root
+  password: password

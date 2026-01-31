@@ -1,0 +1,8 @@
+name: DBConnectorN
+version: 1.0.0
+main: jp.asteria.dbconnector.DBConnectorN
+description: Nukkit用DB接続用プラグイン
+author: deceitya
+website: https://github.com/XxPMMPERxX/DBConnectorN
+api: 2.0.0
+load: POSTWORLD
