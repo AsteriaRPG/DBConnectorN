@@ -1,5 +1,5 @@
 name: DBConnectorN
-version: 1.2.0
+version: 1.2.1
 main: jp.asteria.dbconnector.DBConnectorN
 description: Nukkit用DB接続用プラグイン
 author: deceitya
