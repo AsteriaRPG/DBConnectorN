@@ -12,6 +12,12 @@ object Database {
     internal var conn: Connection? = null
 
     /**
+     * DBの種類
+     */
+    lateinit var type: DBType
+        private set
+
+    /**
      * コネクション取得
      *
      * @return transactionスコープ外ではnullしか返ってこない
@@ -35,7 +41,9 @@ object Database {
         }
     }
 
-    internal fun connect(url: String, driver: String = "", user: String = "", password: String = "") {
+    internal fun connect(type: DBType, url: String, driver: String = "", user: String = "", password: String = "") {
+        this.type = type
+
         val config = HikariConfig()
         config.jdbcUrl = url
         config.driverClassName = driver

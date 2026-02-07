@@ -1,11 +1,11 @@
 plugins {
-    kotlin("jvm") version "2.2.21"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    kotlin("jvm") version "2.3.0"
+    id("com.gradleup.shadow") version "9.3.0"
     `maven-publish`
 }
 
 group = "jp.asteria"
-version = "1.0.0"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
