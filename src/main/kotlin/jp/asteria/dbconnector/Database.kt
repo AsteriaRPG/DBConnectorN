@@ -3,6 +3,7 @@ package jp.asteria.dbconnector
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import java.sql.Connection
+import javax.sql.DataSource
 
 object Database {
     @PublishedApi
@@ -18,11 +19,18 @@ object Database {
         private set
 
     /**
-     * コネクション取得
+     * transaction{}のブロックでのみ有効なConnectionを返す
      *
      * @return transactionスコープ外ではnullしか返ってこない
      */
-    fun getConnection(): Connection? = conn
+    fun getTransactionConnection(): Connection? = conn
+
+    /**
+     * データソース取得
+     *
+     * @return
+     */
+    fun getDataSource(): DataSource = dataSource
 
     inline fun <T> transaction(statement: () -> T): T {
         try {

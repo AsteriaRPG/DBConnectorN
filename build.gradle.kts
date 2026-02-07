@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "jp.asteria"
-version = "1.1.0"
+version = "1.2.0"
 
 repositories {
     mavenCentral()
@@ -15,10 +15,12 @@ repositories {
 }
 
 dependencies {
+    compileOnly(kotlin("stdlib"))
+    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.3.0")
     compileOnly("org.powernukkitx:server:2.0.0-SNAPSHOT")
-    implementation("com.zaxxer:HikariCP:7.0.2")
-    implementation("com.mysql:mysql-connector-j:9.6.0")
-    implementation("org.xerial:sqlite-jdbc:3.51.1.0")
+    compileOnly("com.zaxxer:HikariCP:7.0.2")
+    compileOnly("com.mysql:mysql-connector-j:9.6.0")
+    compileOnly("org.xerial:sqlite-jdbc:3.51.1.0")
 }
 
 kotlin {
