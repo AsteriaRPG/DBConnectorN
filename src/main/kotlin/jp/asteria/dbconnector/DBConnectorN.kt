@@ -1,6 +1,6 @@
 package jp.asteria.dbconnector
 
-import cn.nukkit.plugin.PluginBase
+import org.powernukkitx.plugin.PluginBase
 
 class DBConnectorN : PluginBase() {
     override fun onEnable() {
