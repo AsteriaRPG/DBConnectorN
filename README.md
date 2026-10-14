@@ -16,7 +16,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("jp.asteria:db-connector-n:1.1.0")
+    compileOnly("jp.asteria:db-connector-n:1.2.2")
 }
 ```
 
@@ -31,7 +31,7 @@ depend:
 ```
 
 ### ソースコード
-transactionスコープ内で例外が発生したらロールバックします(多分)
+`transaction`は成功時にコミットし、例外・Errorの発生時にロールバックする。接続はスレッドごとに管理し、最外のスコープの終了時に閉じる。
 ```kotlin
 import jp.asteria.dbconnector.Database
 import jp.asteria.dbconnector.Database.transaction
@@ -47,3 +47,15 @@ transaction {
 // Exposedとかで使う用でDataSource取得
 val ds = Database.getDataSource()
 ```
+
+## トランザクションの入れ子と互換性
+
+同じスレッドで`Database.transaction`を入れ子にすると、外側と同じ接続でセーブポイントを作る。
+内側の成功は外側のコミットまで確定しない。内側の失敗を外側で捕捉した場合、内側の変更だけを戻して処理を続けられる。
+セーブポイントへのロールバックに失敗した場合は、外側もコミットせず失敗する。
+
+接続を別スレッドやスコープ外へ持ち出したり、呼び出し側でコミット・クローズしたりしない。
+Exposedなどへ`getDataSource()`を渡して作成したトランザクションは、このJDBCスコープとは別管理となる。
+
+1.2.1以前の`transaction`はinline関数だったため、更新時はJDBCの`transaction`を使うプラグインも1.2.2以降で再ビルドする。
+1.2.2以降は処理をDBConnectorN側で実行する。非ローカルreturnは使わず、結果をブロックの末尾や`return@transaction`で返す。

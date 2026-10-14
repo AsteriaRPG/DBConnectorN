@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "jp.asteria"
-version = "1.2.1"
+version = "1.2.2"
 
 repositories {
     mavenCentral()
@@ -15,6 +15,7 @@ repositories {
 }
 
 dependencies {
+    testImplementation(kotlin("test-junit"))
     compileOnly(kotlin("stdlib"))
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.3.0")
     compileOnly("org.powernukkitx:server:2.0.0-SNAPSHOT")
@@ -45,3 +46,6 @@ publishing {
         }
     }
 }
+
+configurations.testCompileClasspath { extendsFrom(configurations.compileOnly.get()) }
+configurations.testRuntimeClasspath { extendsFrom(configurations.compileOnly.get()) }
