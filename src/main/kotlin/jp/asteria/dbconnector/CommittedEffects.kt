@@ -18,62 +18,100 @@ open class CommittedEffects(
     private class Batch {
         val actions = mutableListOf<() -> Unit>()
         var finished = false
+
+        fun finish(): List<() -> Unit>? {
+            if (finished) return null
+            finished = true
+            val pending = actions.toList()
+            actions.clear()
+            return pending
+        }
+
+        fun discard() {
+            finished = true
+            actions.clear()
+        }
     }
+
     private val key = Key<Batch>()
     private val closed = AtomicBoolean(false)
 
     fun dispatch(action: () -> Unit) {
         if (closed.get()) return
-        isolate { schedule { if (!closed.get()) isolate(action) } }
+        isolate {
+            schedule {
+                if (!closed.get()) isolate(action)
+            }
+        }
     }
 
     fun enqueue(transaction: JdbcTransaction, action: () -> Unit) {
         if (closed.get()) return
-        var batch = transaction.getUserData(key)
-        if (batch == null || batch.finished) {
-            batch = Batch()
-            transaction.putUserData(key, batch)
-            val registered = batch
-            transaction.registerInterceptor(object : StatementInterceptor {
-                override fun afterCommit(transaction: Transaction) {
-                    if (registered.finished) return
-                    registered.finished = true
-                    val pending = registered.actions.toList()
-                    registered.actions.clear()
-                    if (closed.get()) return
-                    isolate {
-                        val jdbc = transaction as JdbcTransaction
-                        val parent = jdbc.outerTransaction
-                        if (parent != null && parent.db === jdbc.db) {
-                            pending.forEach { enqueue(parent, it) }
-                        } else {
-                            // Exposedのcommit callback内ではDBやDSLを実行しない。
-                            schedule {
-                                for (effect in pending) {
-                                    if (closed.get()) break
-                                    isolate(effect)
-                                }
-                            }
-                        }
-                    }
-                }
-                override fun afterRollback(transaction: Transaction) {
-                    registered.finished = true
-                    registered.actions.clear()
-                }
-            })
+        val existing = transaction.getUserData(key)
+        val batch = if (existing == null || existing.finished) {
+            registerBatch(transaction)
+        } else {
+            existing
         }
         batch.actions += action
     }
 
-    private fun isolate(action: () -> Unit) {
-        try { action() } catch (failure: Throwable) {
-            if (failure is VirtualMachineError || failure is ThreadDeath) throw failure
-            try { onFailure(failure) } catch (reportFailure: Throwable) {
-                if (reportFailure is VirtualMachineError || reportFailure is ThreadDeath) throw reportFailure
-                if (reportFailure !== failure) failure.addSuppressed(reportFailure)
+    private fun registerBatch(transaction: JdbcTransaction): Batch {
+        val batch = Batch()
+        transaction.putUserData(key, batch)
+        transaction.registerInterceptor(object : StatementInterceptor {
+            override fun afterCommit(transaction: Transaction) {
+                val pending = batch.finish() ?: return
+                if (closed.get()) return
+                isolate { forwardCommittedActions(transaction as JdbcTransaction, pending) }
+            }
+
+            override fun afterRollback(transaction: Transaction) {
+                batch.discard()
+            }
+        })
+        return batch
+    }
+
+    private fun forwardCommittedActions(transaction: JdbcTransaction, pending: List<() -> Unit>) {
+        val parent = transaction.outerTransaction
+        if (parent != null && parent.db === transaction.db) {
+            pending.forEach { enqueue(parent, it) }
+            return
+        }
+
+        // Exposedのcommit callback内ではDBやDSLを実行しない。
+        schedule {
+            for (effect in pending) {
+                if (closed.get()) break
+                isolate(effect)
             }
         }
     }
-    override fun close() { closed.set(true) }
+
+    private fun isolate(action: () -> Unit) {
+        try {
+            action()
+        } catch (failure: Throwable) {
+            rethrowFatal(failure)
+            reportFailure(failure)
+        }
+    }
+
+    private fun reportFailure(failure: Throwable) {
+        try {
+            onFailure(failure)
+        } catch (reportFailure: Throwable) {
+            rethrowFatal(reportFailure)
+            if (reportFailure !== failure) failure.addSuppressed(reportFailure)
+        }
+    }
+
+    private fun rethrowFatal(failure: Throwable) {
+        if (failure is VirtualMachineError || failure is ThreadDeath) throw failure
+    }
+
+    override fun close() {
+        closed.set(true)
+    }
 }
