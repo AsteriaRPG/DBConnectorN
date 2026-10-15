@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "jp.asteria"
-version = "1.2.2"
+version = "1.3.0"
 
 repositories {
     mavenCentral()
@@ -16,6 +16,8 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test-junit"))
+    compileOnly("org.jetbrains.exposed:exposed-core:1.0.0")
+    compileOnly("org.jetbrains.exposed:exposed-jdbc:1.0.0")
     compileOnly(kotlin("stdlib"))
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.3.0")
     compileOnly("org.powernukkitx:server:2.0.0-SNAPSHOT")
