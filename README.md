@@ -16,7 +16,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("jp.asteria:db-connector-n:1.3.0")
+    compileOnly("jp.asteria:db-connector-n:1.4.0")
 }
 ```
 
@@ -85,3 +85,13 @@ org.jetbrains.exposed.v1.jdbc.transactions.transaction {
 同じDBの子トランザクションの予約は親へ引き継ぎ、最外の保存後だけに実行する。取消・SQL再試行の失敗分は破棄する。通知・予約・エラー報告の失敗で保存済みデータを取り消したり再試行したりしない。致命的なVMエラーは伝播する。
 
 所有するプラグインごとにインスタンスを作り、停止時に`close()`する。停止後は未実行の予約と新規予約を無効にする。開始済みの処理は中断しない。`dispatch { ... }`はDB保存を伴わない処理を同じ実行先へ予約する。別インスタンス間の実行順は保証しない。
+
+## ExposedのSQL保存境界
+
+`SqlStoreTransactions`はExposed 1.0.0でSQL保存を行うサービスの共通境界である。DB処理を開始する前に`SqlStoreTransactions.initialize()`を一度呼ぶ。PlayersIDは有効化時に登録する。通常のJDBCのみを利用する場合は初期化せず、Exposedも不要。
+
+`SqlStoreTransactions.write(protectedTables) { ... }`は現在のExposed接続に参加し、外側がなければトランザクションを作る。`protectedTables`へのORM書き込みを同じDBの親・子を含めて拒否する。直接SQLで更新する担当サービスだけをブロック内で呼び、DAO更新を混在させない。任意の直接SQLによる変更自体を検知する機能ではない。
+
+ブロックの失敗や禁止したORM書き込みを捕捉しても、同じDBの親を含むトランザクション全体の保存を拒否する。子のセーブポイントを戻しても親は続行せず、例外は最外へ伝えて取り消す。競合時は最外全体を再試行する。別DBのトランザクションや`Database.transaction`には参加しない。独自の行ロックやゲームルールは追加しないため、各サービスが必要なロックを同じ境界内で取得する。
+
+ブロックは再試行され得る。結果にはID・不変値を返し、接続・DAOを保持しない。実体の変更や外部通知には保存後の`CommittedEffects`などを使う。監視の登録を伴うため、更新時はサーバー全体を再起動する。
