@@ -16,7 +16,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("jp.asteria:db-connector-n:1.4.0")
+    compileOnly("jp.asteria:db-connector-n:1.5.0")
 }
 ```
 
@@ -95,3 +95,12 @@ org.jetbrains.exposed.v1.jdbc.transactions.transaction {
 ブロックの失敗や禁止したORM書き込みを捕捉しても、同じDBの親を含むトランザクション全体の保存を拒否する。子のセーブポイントを戻しても親は続行せず、例外は最外へ伝えて取り消す。競合時は最外全体を再試行する。別DBのトランザクションや`Database.transaction`には参加しない。独自の行ロックやゲームルールは追加しないため、各サービスが必要なロックを同じ境界内で取得する。
 
 ブロックは再試行され得る。結果にはID・不変値を返し、接続・DAOを保持しない。実体の変更や外部通知には保存後の`CommittedEffects`などを使う。監視の登録を伴うため、更新時はサーバー全体を再起動する。
+
+
+## SQL操作の結果台帳
+
+`SqlOperationLedger.initializeSchema()`で操作台帳を準備し、PlayerTransactions等で必要な管理元のロックを取った外側SQL UOWから`enlist`を呼ぶ。`CanonicalRequest`はキー順を固定したUTF-8 JSONを保存する。文字列・整数・真偽・null・リスト・文字列キーのMapを受け付け、小数と不正Unicodeを拒否する。
+
+owner/operationIdまたはowner/sourceIdが一致する再送では、同じ要求・参加者・定義版なら元の結果を返して処理を再実行しない。異なる要求は`Conflict`。sourceIdが同じなら別operationIdでの再送も元のoperationIdを返す。結果は外側commitまで確定しない。`COMMITTED`・`REJECTED`・`HELD`を記録でき、拒否結果を返す処理は業務更新を行わない契約とする。
+
+callbackはSQL処理だけを行う。native在庫・表示・通知は呼ばない。初回同時要求のunique制約競合やSQL失敗は最外を取り消し、同じIDで結果を照会する。返答喪失を根拠に新しいIDで消費・返金しない。結果byteは保存・返却ともコピーする。台帳はnativeの投影・永続保存、保存後配送を保証するものではない。
