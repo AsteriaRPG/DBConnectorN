@@ -104,3 +104,13 @@ org.jetbrains.exposed.v1.jdbc.transactions.transaction {
 owner/operationIdまたはowner/sourceIdが一致する再送では、同じ要求・参加者・定義版なら元の結果を返して処理を再実行しない。異なる要求は`Conflict`。sourceIdが同じなら別operationIdでの再送も元のoperationIdを返す。結果は外側commitまで確定しない。`COMMITTED`・`REJECTED`・`HELD`を記録でき、拒否結果を返す処理は業務更新を行わない契約とする。
 
 callbackはSQL処理だけを行う。native在庫・表示・通知は呼ばない。初回同時要求のunique制約競合やSQL失敗は最外を取り消し、同じIDで結果を照会する。返答喪失を根拠に新しいIDで消費・返金しない。結果byteは保存・返却ともコピーする。台帳はnativeの投影・永続保存、保存後配送を保証するものではない。
+
+## 永続配送と受信済み記録
+
+`SqlOutbox.enlist`は`SqlOperationLedger.enlist`のaction内で、送信元の成功結果と配送依頼を同じSQL UOWへ入れる。外側のcommit時に成功結果を確認し、後から別transactionで配送依頼だけを生成しない。同じevent/sourceとpayloadの再送は元の記録を返し、異なる内容は競合になる。payloadはCanonicalRequestの不変bytesで、DAOやnative Itemを保持しない。
+
+配送分類はサーバーの固定handler定義からRouteへ渡し、作成時に保存する。claim側やpayloadから選び直さない。`SQL_ONCE`は受信側の`consumeSql`でdomain更新・inbox・ACKを同じ、必要な全プレイヤーをロック済みのUOWへ入れる。受信記録はproducer・source operation・event typeも固定し、同じ出所のevent/hashならconsumerを再実行しない。異sourceや異hashは元bytesを保持してHELDにし、別の操作を受信済みと誤認しない。受信側の保存を複数の独立transactionへ分けない。
+
+`REBUILD_PROJECTION`は確定済み原本を再構築する処理だけに用いる。`NATIVE_FENCED`は加算型native処理で、期限切れのLEASEDを自動再配送せずHELDにする。native適用の結果は管理元が照合し、置換の観測または永続結果を確認してから`acknowledge`する。ACKはnativeファイルの耐久保存完了ではない。
+
+leaseはDBのUTC時刻、worker epoch、revisionで照合する。古いworkerは現在のleaseを消費・ACKできない。workerはowner世代・actor sessionも管理元で検査し、停止時は新規pollingを止める。DBConnectorN自身はhandler登録・worker予約・native再実行を行わない。配送分類の一致を起動時に検査し、不明なpayload版は管理元がHELDにする。hash破損はCorruptPayloadとして通知し、失敗した読取UOWを閉じてから`quarantine`で元bytesを保持する。

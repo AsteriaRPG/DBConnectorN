@@ -16,6 +16,7 @@ object SqlStoreTransactions {
         val tables = mutableSetOf<String>()
         var rejected = false
         var failed = false
+        val commitChecks = mutableListOf<() -> Unit>()
     }
 
     // Exposed clears userData after rollback, including an automatic rollback caused by
@@ -51,6 +52,8 @@ object SqlStoreTransactions {
                     "A failed SQL write requires the whole transaction to roll back"
                 }
             }
+            // savepointの解放時点では、外側の操作結果はまだRECEIVEDでよい。
+            if (scope.outerTransaction?.db !== scope.db) guards[scope]?.commitChecks?.forEach { it() }
         }
     }
 
@@ -75,6 +78,15 @@ object SqlStoreTransactions {
                 throw failure
             }
         }
+    }
+
+    /** 外側commit時のSQL不変条件。native処理や独立transactionをcheckへ入れない。 */
+    fun checkBeforeCommit(validation: () -> Unit) {
+        val current = org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager.current()
+        check(registered && Database.getTransactionConnection() == null)
+        var root = current
+        forEachSameDatabaseScope(current) { root = it }
+        guard(root).commitChecks += validation
     }
 
     private fun guard(scope: JdbcTransaction): Guard = synchronized(guards) {
