@@ -48,6 +48,10 @@ class SqlOperationLedgerTest {
         val again = invoke(id) { error("Replayed callback") }
         val otherId = invoke(UUID.randomUUID()) { error("Replayed source") }
         assertEquals(id, otherId.operationId)
+        transaction {
+            assertEquals(id, SqlOperationLedger.queryBySource("test", "test/1")?.operationId)
+            assertNull(SqlOperationLedger.queryBySource("test", "missing"))
+        }
         assertContentEquals(byteArrayOf(1, 2, 3), again.resultBytes())
         assertEquals(9, balance()); assertEquals(1, calls)
         assertFailsWith<SqlOperationLedger.Conflict> { invoke(id, value = 2) { error("Conflict callback") } }

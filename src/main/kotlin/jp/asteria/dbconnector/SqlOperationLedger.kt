@@ -97,13 +97,21 @@ object SqlOperationLedger {
     /** 独立したreadトランザクションからの結果照会にも使える。DB不明は呼出元がHELDにする。 */
     fun query(owner: String, operationId: UUID): Receipt? = find(owner, operationId, null, false).singleOrNull()?.receipt
 
-    private fun find(owner: String, operationId: UUID, sourceId: String?, lock: Boolean): List<Stored> {
+    /** 固定sourceから元の結果を照会する。欠損と破損を混同しない。 */
+    fun queryBySource(owner: String, sourceId: String): Receipt? =
+        find(owner, null, sourceId, false).singleOrNull()?.receipt
+
+    private fun find(owner: String, operationId: UUID?, sourceId: String?, lock: Boolean): List<Stored> {
         val suffix = if (lock && connection().metaData.databaseProductName in setOf("MySQL", "MariaDB")) " FOR UPDATE" else ""
-        val predicate = if (sourceId == null) "operationId=?" else "(operationId=? OR sourceId=?)"
+        val predicate = when {
+            operationId == null -> "sourceId=?"
+            sourceId == null -> "operationId=?"
+            else -> "(operationId=? OR sourceId=?)"
+        }
         return connection().prepareStatement("SELECT * FROM persistence_operations WHERE owner=? AND $predicate$suffix").use { sql ->
             sql.setString(1, owner)
-            sql.setString(2, operationId.toString())
-            if (sourceId != null) sql.setString(3, sourceId)
+            sql.setString(2, operationId?.toString() ?: requireNotNull(sourceId))
+            if (operationId != null && sourceId != null) sql.setString(3, sourceId)
             sql.executeQuery().use { rows -> buildList {
                 while (rows.next()) {
                     val state = State.valueOf(rows.getString("state"))

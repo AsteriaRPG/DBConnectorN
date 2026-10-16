@@ -114,3 +114,5 @@ callbackはSQL処理だけを行う。native在庫・表示・通知は呼ばな
 `REBUILD_PROJECTION`は確定済み原本を再構築する処理だけに用いる。`NATIVE_FENCED`は加算型native処理で、期限切れのLEASEDを自動再配送せずHELDにする。native適用の結果は管理元が照合し、置換の観測または永続結果を確認してから`acknowledge`する。ACKはnativeファイルの耐久保存完了ではない。
 
 leaseはDBのUTC時刻、worker epoch、revisionで照合する。古いworkerは現在のleaseを消費・ACKできない。workerはowner世代・actor sessionも管理元で検査し、停止時は新規pollingを止める。DBConnectorN自身はhandler登録・worker予約・native再実行を行わない。配送分類の一致を起動時に検査し、不明なpayload版は管理元がHELDにする。hash破損はCorruptPayloadとして通知し、失敗した読取UOWを閉じてから`quarantine`で元bytesを保持する。
+
+`SqlOperationLedger.queryBySource(owner, sourceId)`は固定sourceから元の確定結果を照会する。現在のExposedトランザクションで使用し、結果bytes/hashを通常のoperation ID照会と同じ経路で検証する。欠損と破損を混同しない。
