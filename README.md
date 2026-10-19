@@ -116,3 +116,5 @@ callbackはSQL処理だけを行う。native在庫・表示・通知は呼ばな
 leaseはDBのUTC時刻、worker epoch、revisionで照合する。古いworkerは現在のleaseを消費・ACKできない。workerはowner世代・actor sessionも管理元で検査し、停止時は新規pollingを止める。DBConnectorN自身はhandler登録・worker予約・native再実行を行わない。配送分類の一致を起動時に検査し、不明なpayload版は管理元がHELDにする。hash破損はCorruptPayloadとして通知し、失敗した読取UOWを閉じてから`quarantine`で元bytesを保持する。
 
 `SqlOperationLedger.queryBySource(owner, sourceId)`は固定sourceから元の確定結果を照会する。現在のExposedトランザクションで使用し、結果bytes/hashを通常のoperation ID照会と同じ経路で検証する。欠損と破損を混同しない。
+
+`SqlOperationLedger.queryForParticipants(owner, operationId, participants)`は、固定した参加者集合と一致する受領証だけを返す。参加者不一致は欠損として扱わず拒否する。既存transaction内で使用する。

@@ -97,6 +97,14 @@ object SqlOperationLedger {
     /** 独立したreadトランザクションからの結果照会にも使える。DB不明は呼出元がHELDにする。 */
     fun query(owner: String, operationId: UUID): Receipt? = find(owner, operationId, null, false).singleOrNull()?.receipt
 
+    /** 参加者を含むreceipt参照を検証する。別プレイヤーの成功を流用させない。 */
+    fun queryForParticipants(owner: String, operationId: UUID, participants: List<Int>): Receipt? {
+        require(participants.isNotEmpty() && participants.all { it >= 0 } && participants == participants.distinct().sorted())
+        val stored = find(owner, operationId, null, false).singleOrNull() ?: return null
+        check(stored.participants == participants.joinToString(",", "[", "]")) { "Operation participants differ" }
+        return stored.receipt
+    }
+
     /** 固定sourceから元の結果を照会する。欠損と破損を混同しない。 */
     fun queryBySource(owner: String, sourceId: String): Receipt? =
         find(owner, null, sourceId, false).singleOrNull()?.receipt

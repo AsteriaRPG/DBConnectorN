@@ -51,6 +51,9 @@ class SqlOperationLedgerTest {
         transaction {
             assertEquals(id, SqlOperationLedger.queryBySource("test", "test/1")?.operationId)
             assertNull(SqlOperationLedger.queryBySource("test", "missing"))
+            assertEquals(id, SqlOperationLedger.queryForParticipants("test", id, listOf(1))?.operationId)
+            assertFailsWith<IllegalStateException> { SqlOperationLedger.queryForParticipants("test", id, listOf(2)) }
+            assertNull(SqlOperationLedger.queryForParticipants("test", UUID.randomUUID(), listOf(1)))
         }
         assertContentEquals(byteArrayOf(1, 2, 3), again.resultBytes())
         assertEquals(9, balance()); assertEquals(1, calls)
