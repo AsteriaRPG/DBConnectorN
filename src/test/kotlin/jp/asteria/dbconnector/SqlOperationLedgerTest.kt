@@ -27,6 +27,23 @@ class SqlOperationLedgerTest {
                 mapOf("equipment" to "v1"), action)
         }
 
+    @Test fun unresolvedCountIncludesSharedParticipantsAndReceivingButExcludesTerminalResults() = fixture {
+        invoke(UUID.randomUUID(), source = "held", participants = listOf(1, 11)) {
+            assertEquals(1, SqlOperationLedger.unresolvedCount("test", 1))
+            assertEquals(1, SqlOperationLedger.unresolvedCount("test", 11))
+            assertEquals(0, SqlOperationLedger.unresolvedCount("test", 111))
+            SqlOperationLedger.Outcome(SqlOperationLedger.State.HELD, byteArrayOf(1))
+        }
+        for (state in listOf(SqlOperationLedger.State.COMMITTED, SqlOperationLedger.State.REJECTED)) {
+            invoke(UUID.randomUUID(), source = state.name) { SqlOperationLedger.Outcome(state, byteArrayOf(2)) }
+        }
+        transaction {
+            assertEquals(1, SqlOperationLedger.unresolvedCount("test", 1))
+            assertEquals(1, SqlOperationLedger.unresolvedCount("test", 11))
+            assertEquals(0, SqlOperationLedger.unresolvedCount("other", 1))
+        }
+    }
+
     @Test fun canonicalIdentityIsStableAndRejectsLossyValues() {
         val first = CanonicalRequest(mapOf("b" to listOf(null, true, 2), "a" to "日本語\n\""))
         val second = CanonicalRequest(mapOf("a" to "日本語\n\"", "b" to listOf(null, true, 2)))

@@ -105,6 +105,29 @@ object SqlOperationLedger {
         return stored.receipt
     }
 
+    /** 共有操作も含め、本人が参加した未解決操作を実保存先から数える。 */
+    fun unresolvedCount(owner: String, playerId: Int): Int {
+        require(owner.isNotBlank() && playerId >= 0)
+        return connection().prepareStatement(
+            "SELECT participants FROM persistence_operations WHERE owner=? AND state NOT IN ('COMMITTED','REJECTED')"
+        ).use { sql ->
+            sql.setString(1, owner)
+            sql.executeQuery().use { rows ->
+                var count = 0
+                while (rows.next()) {
+                    val encoded = rows.getString(1)
+                    check(encoded.startsWith('[') && encoded.endsWith(']'))
+                    val participants = encoded.substring(1, encoded.length - 1).split(',').map(String::toInt)
+                    check(participants.isNotEmpty() && participants.all { it >= 0 } &&
+                        participants == participants.distinct().sorted() &&
+                        participants.joinToString(",", "[", "]") == encoded)
+                    if (playerId in participants) count = Math.addExact(count, 1)
+                }
+                count
+            }
+        }
+    }
+
     /** 固定sourceから元の結果を照会する。欠損と破損を混同しない。 */
     fun queryBySource(owner: String, sourceId: String): Receipt? =
         find(owner, null, sourceId, false).singleOrNull()?.receipt

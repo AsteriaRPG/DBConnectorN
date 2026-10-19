@@ -118,3 +118,5 @@ leaseはDBのUTC時刻、worker epoch、revisionで照合する。古いworker�
 `SqlOperationLedger.queryBySource(owner, sourceId)`は固定sourceから元の確定結果を照会する。現在のExposedトランザクションで使用し、結果bytes/hashを通常のoperation ID照会と同じ経路で検証する。欠損と破損を混同しない。
 
 `SqlOperationLedger.queryForParticipants(owner, operationId, participants)`は、固定した参加者集合と一致する受領証だけを返す。参加者不一致は欠損として扱わず拒否する。既存transaction内で使用する。
+
+`SqlOperationLedger.unresolvedCount(owner, playerId)`は、共有操作を含め本人が参加した未解決操作を実保存先から数える。現在のtransaction内のRECEIVEDと保存済みHELDを含み、COMMITTED/REJECTEDを除外する。runtime cacheの空欄を復旧証明に使わないための読取API。
